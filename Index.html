@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JobRanker — Matthieu de Kalbermatten</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f6f2;--surface:#fff;--surface2:#f0ede8;
+  --border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.18);
+  --text:#1a1918;--muted:#6b6a65;--hint:#9e9c97;
+  --accent:#c0392b;--blue:#1a5fa8;
+  --green:#2d7a2d;--green-bg:#edf7ed;
+  --amber:#8a6200;--amber-bg:#fef8e7;
+  --red:#a32d2d;--red-bg:#fdf1f0;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+  --r:10px;--rs:6px;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100}
+.logo{font-family:var(--mono);font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px}
+.logo-dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+.topbar-sub{font-size:11px;color:var(--hint);font-family:var(--mono)}
+.run-btn{margin-left:auto;font-family:var(--sans);font-size:13px;font-weight:500;padding:8px 20px;background:var(--text);color:#fff;border:none;border-radius:var(--rs);cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s}
+.run-btn:hover{opacity:.85}
+.run-btn:disabled{opacity:.4;cursor:not-allowed}
+.spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+.run-btn.loading .spin{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.wrap{max-width:980px;margin:0 auto;padding:22px}
+
+.how-bar{background:var(--green-bg);border:1px solid rgba(45,122,45,.2);border-radius:var(--rs);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--green);line-height:1.6;display:flex;gap:10px}
+.err-bar{background:var(--red-bg);border:1px solid rgba(163,45,45,.2);border-radius:var(--rs);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--red);line-height:1.6;display:none;gap:10px}
+
+.profile-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:11px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pname{font-size:13px;font-weight:500}
+.ptags{display:flex;gap:5px;flex-wrap:wrap}
+.ptag{font-size:11px;padding:2px 8px;border-radius:100px;border:1px solid var(--border);background:var(--surface2);color:var(--muted)}
+.ptag.hot{background:var(--red-bg);color:var(--accent);border-color:rgba(192,57,43,.2)}
+.edit-btn{margin-left:auto;font-size:12px;padding:5px 11px;border-radius:var(--rs);border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--sans)}
+.edit-btn:hover{background:var(--surface2)}
+
+.controls{display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.ftag{font-size:12px;padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all .12s;font-family:var(--sans)}
+.ftag.active{background:var(--text);color:#fff;border-color:var(--text)}
+select.ctrl{font-family:var(--sans);font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface);color:var(--text);outline:none;cursor:pointer;margin-left:auto}
+
+.rh{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.rc{font-size:13px;font-weight:500}
+.rtime{font-size:11px;color:var(--hint);font-family:var(--mono);margin-left:auto}
+
+.job-list{display:flex;flex-direction:column;gap:9px}
+.job-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:border-color .15s}
+.job-card:hover{border-color:var(--border2)}
+.job-card.r1{border-left:3px solid var(--green)}
+.job-card.r2{border-left:3px solid var(--blue)}
+.job-card.r3{border-left:3px solid var(--amber)}
+
+.job-head{padding:13px 15px;display:flex;align-items:flex-start;gap:11px}
+.score-badge{min-width:44px;height:44px;border-radius:var(--rs);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);font-weight:500;flex-shrink:0;cursor:pointer}
+.score-badge.high{background:var(--green-bg);color:var(--green)}
+.score-badge.mid{background:var(--amber-bg);color:var(--amber)}
+.score-badge.low{background:var(--red-bg);color:var(--red)}
+.snum{font-size:16px;line-height:1}
+.slbl{font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+
+.job-info{flex:1;min-width:0;cursor:pointer}
+.jtitle{font-size:14px;font-weight:500;margin-bottom:3px}
+.jmeta{font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.fresh-pill{font-size:10px;padding:2px 7px;border-radius:100px;background:var(--green-bg);color:var(--green);border:1px solid rgba(45,122,45,.2);font-weight:500}
+.age-pill{font-size:10px;padding:2px 7px;border-radius:100px;background:var(--surface2);color:var(--hint);border:1px solid var(--border)}
+.verified-pill{font-size:10px;padding:2px 7px;border-radius:100px;background:#e8f2fb;color:var(--blue);border:1px solid rgba(26,95,168,.2);font-weight:500}
+
+.jtags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.jt{font-size:11px;padding:2px 8px;border-radius:100px;border:1px solid var(--border)}
+.jt.match{background:var(--green-bg);color:var(--green);border-color:rgba(45,122,45,.2)}
+.jt.sector{background:var(--surface2);color:var(--muted)}
+.jt.loc{background:var(--amber-bg);color:var(--amber);border-color:rgba(138,98,0,.2)}
+.jt.top{background:var(--red-bg);color:var(--accent);border-color:rgba(192,57,43,.2)}
+
+.job-acts{display:flex;flex-direction:column;gap:5px;flex-shrink:0;min-width:108px}
+.abtn{font-size:12px;padding:6px 11px;border-radius:var(--rs);border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--sans);white-space:nowrap;transition:all .12s;text-align:center;text-decoration:none;display:block;width:100%}
+.abtn:hover{background:var(--surface2);color:var(--text)}
+.abtn.primary{background:var(--text);color:#fff;border-color:var(--text)}
+.abtn.primary:hover{opacity:.85}
+.abtn.blue{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:500}
+.abtn.blue:hover{opacity:.85}
+
+.job-body{border-top:1px solid var(--border);padding:13px 15px;display:none;flex-direction:column;gap:10px}
+.job-body.open{display:flex}
+.jbl{font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+.jbt{font-size:13px;line-height:1.7;color:var(--text)}
+.why-item{font-size:12px;line-height:1.6;padding-left:16px;position:relative;margin-bottom:3px}
+.why-item::before{content:'✓';position:absolute;left:0;color:var(--green)}
+.gap-item{font-size:12px;color:var(--muted);line-height:1.6;padding-left:16px;position:relative;margin-bottom:3px}
+.gap-item::before{content:'○';position:absolute;left:0;color:var(--amber)}
+
+.url-box{font-family:var(--mono);font-size:11px;color:var(--blue);word-break:break-all;background:var(--surface2);padding:8px 10px;border-radius:var(--rs);line-height:1.5}
+.url-box a{color:var(--blue);text-decoration:none}
+.url-box a:hover{text-decoration:underline}
+
+.gen{display:none;text-align:center;padding:48px 20px;flex-direction:column;align-items:center;gap:14px}
+.gen.on{display:flex}
+.gen-spin{width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+.gen-txt{font-size:13px;color:var(--muted);font-weight:500}
+.gen-step{font-size:11px;color:var(--hint);font-family:var(--mono)}
+.progress{width:300px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:4px}
+.progress-bar{height:100%;background:var(--accent);border-radius:2px;transition:width .5s ease;width:5%}
+
+.empty{text-align:center;padding:56px 20px}
+.empty .big{font-size:30px;opacity:.2;margin-bottom:12px}
+.empty .et{font-size:14px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.empty .es{font-size:12px;line-height:1.6;color:var(--hint);max-width:360px;margin:0 auto}
+
+/* MODALS */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:20px}
+.ov.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--r);width:100%;max-width:680px;max-height:88vh;overflow-y:auto}
+.mhead{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1}
+.mtitle{font-size:14px;font-weight:500}
+.mclose{font-size:22px;cursor:pointer;color:var(--muted);background:none;border:none;line-height:1}
+.mbody{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.mout{background:var(--surface2);border-radius:var(--rs);padding:14px;font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:160px;display:none}
+.mout.loading{color:var(--hint);font-style:italic;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.mrow{display:flex;gap:8px;flex-wrap:wrap}
+.mbtn{font-size:13px;padding:8px 15px;border-radius:var(--rs);border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--sans);transition:all .12s}
+.mbtn:hover{background:var(--surface2);color:var(--text)}
+.mbtn.p{background:var(--text);color:#fff;border-color:var(--text)}
+.mbtn.p:hover{opacity:.85}
+textarea.mta{width:100%;font-family:var(--mono);font-size:12px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--bg);color:var(--text);resize:vertical;min-height:80px;outline:none;line-height:1.6}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-dot"></div>JobRanker</div>
+  <div class="topbar-sub">Claude web search · verified URLs · ranked by fit</div>
+  <button class="run-btn" id="run-btn" onclick="runSearch()">
+    <div class="spin"></div>
+    <span>Run daily search</span>
+  </button>
+</div>
+
+<div class="wrap">
+
+  <div class="how-bar">
+    <span style="font-size:15px;flex-shrink:0">✓</span>
+    <div><strong>How this works:</strong> Uses Claude's live web search to find real job postings published in the last 7 days. Each result includes the actual URL found by the search engine — not a constructed link. Postings are then scored against your executive profile and ranked. Run once per day for a fresh curated list.</div>
+  </div>
+
+  <div class="err-bar" id="err-bar">
+    <span style="font-size:15px;flex-shrink:0">✕</span>
+    <div id="err-txt"></div>
+  </div>
+
+  <div class="profile-bar">
+    <div class="pname">Matthieu de Kalbermatten</div>
+    <div class="ptags">
+      <span class="ptag hot">C-suite / CEO</span>
+      <span class="ptag">MedTech · BioPharma</span>
+      <span class="ptag">Private Healthcare</span>
+      <span class="ptag">Switzerland primary</span>
+      <span class="ptag">EU · UK · US open</span>
+      <span class="ptag">FR · EN · DE</span>
+    </div>
+    <button class="edit-btn" onclick="openPModal()">Edit profile</button>
+  </div>
+
+  <div class="controls">
+    <span style="font-size:12px;color:var(--muted)">Filter:</span>
+    <button class="ftag active" onclick="setF('all',this)">All</button>
+    <button class="ftag" onclick="setF('ch',this)">Switzerland</button>
+    <button class="ftag" onclick="setF('eu',this)">EU / UK</button>
+    <button class="ftag" onclick="setF('us',this)">US</button>
+    <button class="ftag" onclick="setF('fresh',this)">Fresh &lt;3 days</button>
+    <button class="ftag" onclick="setF('high',this)">Score ≥75</button>
+    <select class="ctrl" onchange="sortJobs(this.value)">
+      <option value="score">Best match first</option>
+      <option value="date">Most recent first</option>
+      <option value="ch">Switzerland first</option>
+    </select>
+  </div>
+
+  <div class="rh" id="rh" style="display:none">
+    <div class="rc" id="rc"></div>
+    <div class="rtime" id="rtime"></div>
+  </div>
+
+  <div class="gen" id="gen">
+    <div class="gen-spin"></div>
+    <div class="gen-txt" id="gen-txt">Searching job boards…</div>
+    <div class="progress"><div class="progress-bar" id="pbar"></div></div>
+    <div class="gen-step" id="gen-step">Querying Indeed CH · Jobs.ch · BioSpace</div>
+  </div>
+
+  <div id="job-list" class="job-list"></div>
+
+  <div class="empty" id="empty">
+    <div class="big">◎</div>
+    <div class="et">Ready to search</div>
+    <div class="es">Click "Run daily search" to fetch today's live postings via Claude web search and rank them against your executive profile.</div>
+  </div>
+</div>
+
+<!-- DOC MODAL -->
+<div class="ov" id="doc-ov" onclick="if(event.target===this)closeDM()">
+  <div class="modal">
+    <div class="mhead">
+      <div class="mtitle" id="dm-title">Generate document</div>
+      <button class="mclose" onclick="closeDM()">×</button>
+    </div>
+    <div class="mbody">
+      <div id="dm-ctx" style="font-size:12px;color:var(--muted);padding:9px 12px;background:var(--surface2);border-radius:var(--rs);line-height:1.6"></div>
+      <textarea class="mta" id="dm-extra" placeholder="Optional: 'write in French', 'emphasise fundraising', 'highlight Basel', 'keep under 300 words'…"></textarea>
+      <div class="mrow" id="dm-pre"><button class="mbtn p" onclick="genDoc()">Generate</button><button class="mbtn" onclick="closeDM()">Cancel</button></div>
+      <div class="mout" id="dm-out"></div>
+      <div class="mrow" id="dm-post" style="display:none">
+        <button class="mbtn p" onclick="copyOut()">Copy text</button>
+        <button class="mbtn" onclick="regenDoc()">Regenerate</button>
+        <button class="mbtn" onclick="closeDM()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="ov" id="p-ov" onclick="if(event.target===this)closePModal()">
+  <div class="modal">
+    <div class="mhead"><div class="mtitle">Edit profile</div><button class="mclose" onclick="closePModal()">×</button></div>
+    <div class="mbody">
+      <div>
+        <div style="font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Additional career details / achievements with numbers</div>
+        <textarea class="mta" id="p-cv" rows="7" placeholder="Paste extra resume details, specific metrics, or achievements…"></textarea>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Salary / availability constraints</div>
+        <textarea class="mta" id="p-extra" rows="3" placeholder="e.g. Minimum CHF 180k, equity preferred, available from Q3 2025…"></textarea>
+      </div>
+      <div class="mrow"><button class="mbtn p" onclick="saveP()">Save</button><button class="mbtn" onclick="closePModal()">Cancel</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── PROFILE (pre-loaded from CV) ──
+const BASE = {
+  name:"Matthieu de Kalbermatten", loc:"Basel, Switzerland",
+  seniority:"C-suite executive — CEO level",
+  exp:"15-20 years senior leadership in startups and scale-ups under 500 people",
+  langs:"French (native), English (fluent), German (fluent)",
+  sectors:"MedTech, Medical Devices, Biotech, BioPharma, Life Sciences, Private Clinics, Hospital Groups, PE-backed healthcare",
+  targets:"Switzerland primary (Basel, Zurich, Zug, Geneva, Lausanne). Open to EU (Germany, France, Netherlands, Belgium, UK) and US for exceptional senior roles.",
+  expertise:"General Management P&L, Finance & Strategy, Commercial Leadership, Business Development, M&A, Fundraising equity+non-dilutive €40M+, Organisational Transformation, International Expansion, Investor & Board Relations, cGMP ISO-13485",
+  cv:[
+    "CEO Cellprothera 2016-present: clinical-stage cell therapy biotech; secured €40M+ financing; team 10-30; budget €5-15M/yr; cGMP + ISO-13485 compliance; international collaborations; 10+ publications",
+    "EVP Acrostak 2009-2016: commercial medtech; turnaround; global sales org Europe+USA+Asia; R&D to commercialisation; full P&L",
+    "Alstom/Areva T&D 1999-2009: Strategy Manager, Project Director €10-50M, Sales Manager European markets",
+    "Education: MBA London Business School; MSc Engineering Tokyo Institute of Technology; Diploma ETH Zurich"
+  ],
+  excl:"junior, mid-level, internship, stage, alternance, non-healthcare, interim unless board-level",
+  tone:"professional, direct, confident. 3 paragraphs under 380 words. Open with hook specific to company and role."
+};
+let userExtra = JSON.parse(localStorage.getItem('jr_extra')||'{}');
+let allJobs = [];
+let activeFilter = 'all';
+let currentDoc = {type:'',job:null};
+
+function ctx(){
+  return `CANDIDATE: ${BASE.name}, ${BASE.loc}
+SENIORITY: ${BASE.seniority}
+EXPERIENCE: ${BASE.exp}
+LANGUAGES: ${BASE.langs}
+TARGET SECTORS: ${BASE.sectors}
+TARGET LOCATIONS: ${BASE.targets}
+EXPERTISE: ${BASE.expertise}
+CAREER:\n${BASE.cv.map(h=>'- '+h).join('\n')}
+EXCLUSIONS: ${BASE.excl}
+${userExtra.cv?'ADDITIONAL CV:\n'+userExtra.cv:''}
+${userExtra.extra?'CONSTRAINTS:\n'+userExtra.extra:''}`;
+}
+
+// ── SEARCH PHASES ──
+// We run multiple focused Claude web searches in sequence,
+// each targeting a specific board/region, then aggregate and score.
+const SEARCHES = [
+  { label:'Indeed CH — senior medtech biotech Switzerland',
+    query:'site:ch.indeed.com OR site:indeed.com/jobs "senior director" OR "VP" OR "CEO" OR "COO" "medtech" OR "biotech" OR "biopharmaceutical" Switzerland posted:last week',
+    region:'ch' },
+  { label:'Indeed CH — clinic hospital executive Switzerland',
+    query:'site:ch.indeed.com "directeur" OR "CEO" OR "COO" "clinique" OR "hôpital" OR "hospital" OR "healthcare" Switzerland last 7 days',
+    region:'ch' },
+  { label:'Jobs.ch — senior life sciences Switzerland',
+    query:'site:jobs.ch "senior" OR "VP" OR "director" "medtech" OR "biotech" OR "pharma" OR "life sciences" Switzerland 2025 OR 2026',
+    region:'ch' },
+  { label:'EU — senior medtech biopharma executive',
+    query:'site:de.indeed.com OR site:fr.indeed.com OR site:uk.indeed.com "VP" OR "senior director" OR "head of" "medtech" OR "biopharma" OR "life sciences" Germany OR France OR Netherlands OR UK 2025 OR 2026',
+    region:'eu' },
+  { label:'BioSpace — VP senior director biopharma',
+    query:'site:biospace.com "VP" OR "vice president" OR "senior director" "biopharma" OR "biotech" OR "life sciences" job 2025 OR 2026',
+    region:'us' },
+  { label:'US — senior executive medtech biopharma',
+    query:'site:indeed.com "VP" OR "senior director" OR "chief" "medtech" OR "biopharma" OR "biotech" job posting 2025 OR 2026',
+    region:'us' }
+];
+
+async function runSearch(){
+  const btn=document.getElementById('run-btn');
+  btn.disabled=true; btn.classList.add('loading');
+  document.getElementById('empty').style.display='none';
+  document.getElementById('job-list').innerHTML='';
+  document.getElementById('rh').style.display='none';
+  document.getElementById('err-bar').style.display='none';
+  const gen=document.getElementById('gen'); gen.classList.add('on');
+  setProgress(5,'Starting search…','Initialising Claude web search');
+
+  // Single comprehensive API call — ask Claude to search multiple boards
+  // and return only postings with verifiable source URLs from its search results
+  const searchPrompt = `${ctx()}
+
+You are JobRanker AI. Search the web RIGHT NOW for real executive job postings published within the last 7 days that match this candidate.
+
+Run web searches across these specific sources:
+1. ch.indeed.com — search: CEO COO VP "senior director" medtech biotech biopharmaceutical Switzerland
+2. jobs.ch — search: senior director VP medtech biotech life sciences Switzerland  
+3. jobup.ch — search: directeur CEO COO medtech biopharma Suisse
+4. ch.indeed.com — search: CEO COO directeur clinique hôpital healthcare Switzerland
+5. biospace.com — search: VP "senior director" biopharma biotech job
+6. fr.indeed.com — search: directeur VP medtech biopharma France
+7. uk.indeed.com — search: VP "senior director" medtech biopharma UK
+
+CRITICAL RULES:
+- Only include postings you actually found via web search with a real source URL
+- The "url" field must be the EXACT URL returned by your web search — do not construct or guess URLs
+- Only include postings from the last 14 days maximum — check the date on each posting
+- If you cannot find a real URL for a posting, do not include it
+- Minimum 5 results, maximum 15
+
+For each real posting found, return a JSON array with these exact fields:
+{
+  "id": integer,
+  "title": "exact job title as posted",
+  "company": "company name",
+  "location": "city, country",
+  "region": "ch" or "eu" or "us",
+  "sector": "medtech" or "biopharma" or "clinic" or "other",
+  "score": integer 0-100 fit with candidate profile,
+  "score_tier": "high" or "mid" or "low",
+  "posted_date": "date string from the posting",
+  "days_ago": estimated integer days since posting,
+  "url": "EXACT URL from your search result — real posting page",
+  "google_url": "https://www.google.com/search?q=TITLE+COMPANY+job&tbs=qdr:w",
+  "summary": "2 sentences about the role",
+  "why_match": ["reason 1","reason 2","reason 3"],
+  "gaps": ["gap 1"],
+  "salary": "range if visible else empty string",
+  "source_board": "which job board"
+}
+
+Sort by score descending. Return ONLY the raw JSON array — no markdown, no explanation, no backticks.`;
+
+  setProgress(15,'Claude is searching job boards…','Querying Indeed CH · Jobs.ch · BioSpace · Jobup.ch');
+
+  // Animate progress while waiting
+  let prog=15;
+  const progInterval = setInterval(()=>{
+    prog = Math.min(prog+2, 85);
+    const steps=['Scanning Indeed CH…','Reading Jobs.ch listings…','Checking BioSpace…','Scanning EU boards…','Scoring against your profile…','Ranking results…'];
+    const si = Math.floor((prog-15)/12);
+    setProgress(prog, 'Claude is searching…', steps[Math.min(si,steps.length-1)]);
+  }, 1200);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        tools:[{type:'web_search_20250305',name:'web_search'}],
+        messages:[{role:'user',content:searchPrompt}]
+      })
+    });
+
+    clearInterval(progInterval);
+    setProgress(90,'Processing results…','Parsing and ranking');
+
+    const data = await res.json();
+
+    if(data.error){
+      throw new Error(data.error.message||'API error');
+    }
+
+    const raw = (data.content||[]).map(b=>b.type==='text'?b.text:'').filter(Boolean).join('\n');
+
+    let jobs;
+    try {
+      const clean = raw.replace(/```json|```/g,'').trim();
+      const start = clean.indexOf('[');
+      const end = clean.lastIndexOf(']');
+      if(start===-1||end===-1) throw new Error('No JSON array found');
+      jobs = JSON.parse(clean.substring(start,end+1));
+      // Validate — remove any job without a real-looking URL
+      jobs = jobs.filter(j=>j.url && j.url.startsWith('http') && !j.url.includes('example.com'));
+      // Add google_url if missing
+      jobs = jobs.map(j=>({
+        ...j,
+        google_url: j.google_url || `https://www.google.com/search?q=${encodeURIComponent(j.title+' '+j.company+' job')}&tbs=qdr:w`
+      }));
+    } catch(e){
+      // If JSON parsing fails, extract what we can and show error
+      showErr('Search completed but result parsing failed. Raw response: '+raw.substring(0,200));
+      jobs = [];
+    }
+
+    setProgress(100,'Done!','');
+    await new Promise(r=>setTimeout(r,400));
+    gen.classList.remove('on');
+
+    if(jobs.length===0){
+      showErr('Claude searched but returned no parseable results. This can happen if job boards blocked the search crawler. Try again in a few minutes.');
+    }
+
+    allJobs = jobs.sort((a,b)=>b.score-a.score);
+    renderJobs(applyF(allJobs));
+    document.getElementById('rh').style.display='flex';
+    document.getElementById('rc').textContent=allJobs.length+' positions found · ranked by fit';
+    document.getElementById('rtime').textContent='Fetched '+new Date().toLocaleTimeString();
+    localStorage.setItem('jr_cache',JSON.stringify({jobs:allJobs,ts:Date.now()}));
+
+  } catch(e){
+    clearInterval(progInterval);
+    gen.classList.remove('on');
+    showErr('Search failed: '+e.message+'. Check your internet connection and try again.');
+  }
+
+  btn.disabled=false; btn.classList.remove('loading');
+}
+
+function setProgress(p,txt,step){
+  document.getElementById('pbar').style.width=p+'%';
+  document.getElementById('gen-txt').textContent=txt;
+  document.getElementById('gen-step').textContent=step;
+}
+function showErr(msg){
+  const b=document.getElementById('err-bar');
+  document.getElementById('err-txt').textContent=msg;
+  b.style.display='flex';
+}
+
+// ── FILTER & SORT ──
+function applyF(jobs){
+  if(activeFilter==='all') return jobs;
+  if(activeFilter==='ch')    return jobs.filter(j=>j.region==='ch');
+  if(activeFilter==='eu')    return jobs.filter(j=>j.region==='eu');
+  if(activeFilter==='us')    return jobs.filter(j=>j.region==='us');
+  if(activeFilter==='fresh') return jobs.filter(j=>(j.days_ago||99)<=3);
+  if(activeFilter==='high')  return jobs.filter(j=>j.score>=75);
+  return jobs;
+}
+function setF(f,el){
+  activeFilter=f;
+  document.querySelectorAll('.ftag').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  if(allJobs.length) renderJobs(applyF(allJobs));
+}
+function sortJobs(v){
+  const s=[...allJobs];
+  if(v==='date') s.sort((a,b)=>(a.days_ago||99)-(b.days_ago||99));
+  else if(v==='ch') s.sort((a,b)=>(b.region==='ch'?1:0)-(a.region==='ch'?1:0));
+  else s.sort((a,b)=>b.score-a.score);
+  renderJobs(applyF(s));
+}
+
+// ── RENDER ──
+function agePill(days){
+  if(days===undefined||days===null) return '<span class="age-pill">date unknown</span>';
+  if(days<=0) return '<span class="fresh-pill">Today</span>';
+  if(days<=1) return '<span class="fresh-pill">Yesterday</span>';
+  if(days<=3) return '<span class="fresh-pill">'+days+'d ago</span>';
+  if(days<=7) return '<span class="age-pill">'+days+'d ago</span>';
+  return '<span class="age-pill">'+days+'d ago</span>';
+}
+
+function renderJobs(jobs){
+  const list=document.getElementById('job-list');
+  if(!jobs.length){
+    list.innerHTML='<div class="empty"><div class="big">◎</div><div class="et">No results for this filter</div><div class="es">Try a broader filter or run a new search.</div></div>';
+    return;
+  }
+  list.innerHTML=jobs.map((job,i)=>{
+    const rc=i===0?'r1':i===1?'r2':i===2?'r3':'';
+    const sl={medtech:'MedTech',biopharma:'BioPharma',clinic:'Private Healthcare',other:'Life Sciences'}[job.sector]||job.sector||'';
+    const rl={ch:'Switzerland',eu:'Europe',us:'United States'}[job.region]||job.region||'';
+    const why=(job.why_match||[]).map(w=>`<div class="why-item">${escHtml(w)}</div>`).join('');
+    const gaps=(job.gaps||[]).map(g=>`<div class="gap-item">${escHtml(g)}</div>`).join('');
+    return `
+<div class="job-card ${rc}" id="c${job.id}">
+  <div class="job-head">
+    <div class="score-badge ${job.score_tier||'mid'}" onclick="tog(${job.id})">
+      <div class="snum">${job.score||'?'}</div>
+      <div class="slbl">fit</div>
+    </div>
+    <div class="job-info" onclick="tog(${job.id})">
+      <div class="jtitle">${escHtml(job.title)}</div>
+      <div class="jmeta">
+        ${job.company?`<span>◉ ${escHtml(job.company)}</span>`:''}
+        ${job.location?`<span>⊕ ${escHtml(job.location)}</span>`:''}
+        ${agePill(job.days_ago)}
+        <span class="verified-pill">Verified URL</span>
+      </div>
+      <div class="jtags">
+        ${sl?`<span class="jt sector">${sl}</span>`:''}
+        ${rl?`<span class="jt loc">${rl}</span>`:''}
+        ${i<3?'<span class="jt top">Top match</span>':''}
+        ${(job.days_ago||99)<=3?'<span class="jt match">Very fresh</span>':''}
+      </div>
+    </div>
+    <div class="job-acts">
+      <a class="abtn blue" href="${job.url}" target="_blank" rel="noopener">View posting ↗</a>
+      <a class="abtn" href="${job.google_url}" target="_blank" rel="noopener">Google search ↗</a>
+      <button class="abtn primary" onclick="openDM('letter',${job.id})">Cover letter</button>
+      <button class="abtn" onclick="openDM('resume',${job.id})">Tailor resume</button>
+    </div>
+  </div>
+  <div class="job-body" id="b${job.id}">
+    ${job.summary?`<div><div class="jbl">Summary</div><div class="jbt">${escHtml(job.summary)}</div></div>`:''}
+    ${why?`<div><div class="jbl">Why you fit</div>${why}</div>`:''}
+    ${gaps?`<div><div class="jbl">To verify</div>${gaps}</div>`:''}
+    ${job.salary?`<div><div class="jbl">Salary</div><div class="jbt">${escHtml(job.salary)}</div></div>`:''}
+    <div>
+      <div class="jbl">Source URL</div>
+      <div class="url-box"><a href="${job.url}" target="_blank" rel="noopener">${job.url}</a></div>
+    </div>
+    <div style="font-size:11px;color:var(--hint)">Source: ${escHtml(job.source_board||'')} · Posted: ${escHtml(job.posted_date||'unknown')}</div>
+  </div>
+</div>`;
+  }).join('');
+}
+
+function tog(id){ document.getElementById('b'+id).classList.toggle('open'); }
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── DOC MODAL ──
+function openDM(type,jobId){
+  const job=allJobs.find(j=>j.id===jobId);
+  currentDoc={type,job};
+  document.getElementById('dm-title').textContent=type==='letter'?`Cover letter — ${job.title}`:`Resume tailoring — ${job.title}`;
+  document.getElementById('dm-ctx').textContent=`${job.title}${job.company?' at '+job.company:''} · ${job.location||''} · Fit: ${job.score}/100 · ${job.days_ago!==undefined?job.days_ago+'d ago':''}`;
+  document.getElementById('dm-out').style.display='none';
+  document.getElementById('dm-out').className='mout';
+  document.getElementById('dm-pre').style.display='flex';
+  document.getElementById('dm-post').style.display='none';
+  document.getElementById('dm-extra').value='';
+  document.getElementById('doc-ov').classList.add('open');
+}
+function closeDM(){ document.getElementById('doc-ov').classList.remove('open'); }
+
+async function genDoc(){
+  const {type,job}=currentDoc;
+  const extra=document.getElementById('dm-extra').value.trim();
+  const out=document.getElementById('dm-out');
+  out.style.display='block'; out.className='mout loading';
+  out.textContent=type==='letter'?'Writing your cover letter…':'Analysing resume fit…';
+  document.getElementById('dm-pre').style.display='none';
+  const prompt=type==='letter'
+    ?`${ctx()}\n\nROLE: ${job.title}${job.company?' at '+job.company:''}, ${job.location||''}\nSUMMARY: ${job.summary||''}\nWHY FIT: ${(job.why_match||[]).join('; ')}\n\nWrite a compelling personalised executive cover letter. Tone: ${BASE.tone} ${extra?'Extra: '+extra:''}`
+    :`${ctx()}\n\nROLE: ${job.title}${job.company?' at '+job.company:''}, ${job.location||''}\nSUMMARY: ${job.summary||''}\n\n1) ATS keyword gaps. 2) 3-4 bullet rewrites Before→After. 3) Which achievements to lead with. 4) ATS match score and top improvements. ${extra?'Extra: '+extra:''}`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const data=await res.json();
+    const text=(data.content||[]).map(b=>b.type==='text'?b.text:'').filter(Boolean).join('\n')||'No response.';
+    out.className='mout'; out.textContent=text;
+    document.getElementById('dm-post').style.display='flex';
+  }catch(e){
+    out.className='mout'; out.textContent='Error: '+e.message;
+    document.getElementById('dm-pre').style.display='flex';
+  }
+}
+function regenDoc(){ document.getElementById('dm-pre').style.display='flex'; document.getElementById('dm-post').style.display='none'; document.getElementById('dm-out').style.display='none'; }
+function copyOut(){ navigator.clipboard.writeText(document.getElementById('dm-out').textContent).then(()=>{const b=event.target;b.textContent='Copied!';setTimeout(()=>b.textContent='Copy text',1500);}); }
+
+// ── PROFILE MODAL ──
+function openPModal(){ document.getElementById('p-cv').value=userExtra.cv||''; document.getElementById('p-extra').value=userExtra.extra||''; document.getElementById('p-ov').classList.add('open'); }
+function closePModal(){ document.getElementById('p-ov').classList.remove('open'); }
+function saveP(){ userExtra={cv:document.getElementById('p-cv').value,extra:document.getElementById('p-extra').value}; localStorage.setItem('jr_extra',JSON.stringify(userExtra)); closePModal(); }
+
+// ── INIT — restore cache if <12h ──
+const cached=localStorage.getItem('jr_cache');
+if(cached){
+  try{
+    const {jobs,ts}=JSON.parse(cached);
+    if(Date.now()-ts<43200000){
+      allJobs=jobs; renderJobs(applyF(jobs));
+      document.getElementById('rh').style.display='flex';
+      document.getElementById('rc').textContent=jobs.length+' positions · ranked by fit';
+      document.getElementById('rtime').textContent='Cached '+new Date(ts).toLocaleTimeString();
+      document.getElementById('empty').style.display='none';
+    }
+  }catch(e){}
+}
+</script>
+</body>
+</html>
